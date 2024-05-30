@@ -173,12 +173,14 @@ def collision_sprite():
         return False
     else: return True
 
-def get_score(player, pipes):
+def get_score(player, pipes, score):
     for pipe in pipes:
         if not pipe.scored and player.rect.x > pipe.rect.x:
             pipe.scored = True
             score = score + 1
             break
+    print(score)
+    return score
 
 pygame.init()
 
@@ -228,12 +230,13 @@ while running:
                 bottompipe_y_placement = toppipe_y_placement + 175
                 pipe_group.add(Pipe(toppipe_y_placement, SCREEN_WIDTH, "top pipe"))
                 pipe_group.add(Pipe(bottompipe_y_placement, SCREEN_WIDTH, "bottom pipe"))
-            get_score(player.sprite, pipe_group.sprites())
+
 
     if game_active:
         pipe_group.update()
         ground.update()
         player.update()
+        score = get_score(player.sprite, pipe_group.sprites(), score)
 
     pygame.display.update()
     clock.tick(60)
