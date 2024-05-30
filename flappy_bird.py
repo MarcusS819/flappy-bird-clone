@@ -1,13 +1,14 @@
 import pygame
+import random
 from sys import exit
 
 # Function will get each frame in the image file when called with the following parameters.
 # the frame variable is how much frames are in the single image file
 # the width and height varaible is the width and height per frame
 # scale variable is to resize the image
-def get_sprite_frame(sheet, frame, width, height, scale):
+def get_sprite_frame(sheet, frame, width, height, row, scale):
     x = frame * width
-    y = 0
+    y = row * height
     sprite_frame = sheet.subsurface(pygame.Rect(x, y, width, height))
     sprite_frame = pygame.transform.scale(sprite_frame, (width * scale, height * scale))
     return sprite_frame
@@ -17,15 +18,18 @@ class Player(pygame.sprite.Sprite):
         super().__init__()
         PLAYER_SPRITE_WIDTH = 16
         PLAYER_SPRITE_HEIGHT = 16
-        PLAYER_FRAME_COUNT = 4
+        SPRITE_SHEET_ROW = 0
         PLAYER_SCALE = 4
+        PLAYER_FRAME_COUNT = 4
+        X_OFF_SET = 50
 
         # Sprites
         player_sprite_sheet = pygame.image.load("Player/StyleBird1/Bird1-1.png").convert_alpha()
         self.current_frame = 0
-        self.frames = [get_sprite_frame(player_sprite_sheet, frame, PLAYER_SPRITE_WIDTH, PLAYER_SPRITE_HEIGHT, PLAYER_SCALE) for frame in range(PLAYER_FRAME_COUNT)]
+        self.frames = [get_sprite_frame(player_sprite_sheet, frame, PLAYER_SPRITE_WIDTH, PLAYER_SPRITE_HEIGHT, SPRITE_SHEET_ROW, PLAYER_SCALE) for frame in range(PLAYER_FRAME_COUNT)]
         self.image = self.frames[self.current_frame]
-        self.rect = self.image.get_rect(midright = (SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
+        self.rect = self.image.get_rect(midright = ((SCREEN_WIDTH / 2) - X_OFF_SET, SCREEN_HEIGHT / 2))
+        self.mask = pygame.mask.from_surface(self.image)
         self.up_angle_velocity = 10
         self.down_angle_velocity = 1.5
         self.target_up_angle = 30
@@ -35,12 +39,12 @@ class Player(pygame.sprite.Sprite):
         self.time_key_pressed = 0
         self.is_jump = False
         self.jump_velocity = 8
-        self.jump_distance = 56
+        self.jump_distance = 72
         self.target_y_pos = None
 
         # For gravity
         self.gravity = 0
-        self.gravity_velocity = 0.3
+        self.gravity_velocity = 0.45
 
         self.angle = 0
     
@@ -91,44 +95,145 @@ class Player(pygame.sprite.Sprite):
         if self.is_jump:
             if self.angle < self.target_up_angle: self.angle += self.up_angle_velocity
             self.image = pygame.transform.rotate(self.image, self.angle)
+            self.rect = self.image.get_rect(midright = self.rect.midright)
+            self.mask = pygame.mask.from_surface(self.image)
         else:
             if self.angle > self.target_down_angle: self.angle -= self.down_angle_velocity
             self.image = pygame.transform.rotate(self.image, self.angle)
+            self.rect = self.image.get_rect(midright = self.rect.midright)
+            self.mask = pygame.mask.from_surface(self.image)
         
-    
-    
     # Call the functions so it updates each frame when called 
     def update(self):
         self.player_controls()
-        self.apply_gravity()
         self.animation_state()
+        self.apply_gravity()
+
+class Ground(pygame.sprite.Sprite):
+    def __init__(self, x_position):
+        super().__init__()
+        GROUND_HEIGHT = 32
+        GROUND_HEIGHT_SCALE = 4
+        
+
+        self.image = pygame.image.load("ground.png").convert()
+        self.image = pygame.transform.scale(self.image, (SCREEN_WIDTH * 2, GROUND_HEIGHT * GROUND_HEIGHT_SCALE))
+        self.rect = self.image.get_rect(bottomleft = (0, SCREEN_HEIGHT))
+        self.mask = pygame.mask.from_surface(self.image)
+        self.rect.x = x_position
+        
+
+        self.ground_velocity = 3.5
+    
+    def move_ground(self):
+        self.rect.right -= self.ground_velocity 
+        if self.rect.right <= 0:
+            self.rect.left = SCREEN_WIDTH
+    
+    def update(self):
+        self.move_ground()
+
+class Pipe(pygame.sprite.Sprite):
+    def __init__(self, y_placement, x_placement, pipe_type):
+        super().__init__()
+        PIPE_SCALE = 3
+
+        self.pipe_velocity = 3.5
+
+        if pipe_type == "top pipe":
+            self.image = pygame.image.load("toppipe.png").convert()
+            self.image = self.scale_image(PIPE_SCALE)
+            self.rect = self.image.get_rect(bottomleft = (x_placement, y_placement))
+            self.mask = pygame.mask.from_surface(self.image)
+            self.scored = True
+        elif pipe_type == "bottom pipe":
+            self.image = pygame.image.load("bottompipe.png").convert()
+            self.image = self.scale_image(PIPE_SCALE)
+            self.rect = self.image.get_rect(topleft = (x_placement, y_placement))
+            self.mask = pygame.mask.from_surface(self.image)
+            self.scored = False
+
+    def scale_image(self, pipe_scale):
+        self.image = pygame.transform.scale(self.image, (self.image.get_width() * pipe_scale, self.image.get_height() * pipe_scale))
+        return self.image
+
+    def move_pipe(self):
+        self.rect.left -= self.pipe_velocity
+
+    def update(self):
+        self.move_pipe()
+        self.destroy()
+
+    def destroy(self):
+	    if self.rect.right <= 0:
+	        self.kill()
+
+def collision_sprite():
+    if pygame.sprite.spritecollide(player.sprite,pipe_group,False, pygame.sprite.collide_mask) or pygame.sprite.spritecollide(player.sprite,ground,False, pygame.sprite.collide_mask):
+        return False
+    else: return True
+
+def get_score(player, pipes):
+    for pipe in pipes:
+        if not pipe.scored and player.rect.x > pipe.rect.x:
+            pipe.scored = True
+            score = score + 1
+            break
 
 pygame.init()
 
-SCREEN_WIDTH = 600
-SCREEN_HEIGHT = 800
+SCREEN_WIDTH = 700
+SCREEN_HEIGHT = 1000
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Flappy Bird")
 
-background_surf = pygame.image.load("Background/Background3.png").convert()
-background_surf = pygame.transform.scale(background_surf, (SCREEN_WIDTH, SCREEN_HEIGHT))
-
 player = pygame.sprite.GroupSingle()
 player.add(Player())
 
+ground1 = Ground(0)
+ground2 = Ground(SCREEN_WIDTH)
+ground = pygame.sprite.Group()
+ground.add(ground1)
+ground.add(ground2)
+
+pipe_group = pygame.sprite.Group()
+
+background_surf = pygame.image.load("Background/Background3.png").convert()
+background_surf = pygame.transform.scale(background_surf, (SCREEN_WIDTH, SCREEN_HEIGHT - ground1.rect.height))
+ 
+score = 0
+
 clock = pygame.time.Clock()
 
+pipe_timer = pygame.USEREVENT + 1
+pygame.time.set_timer(pipe_timer,1700)
+
+game_active = True
 running = True
 while running:
+    game_active = collision_sprite()
+    screen.blit(background_surf, (0, 0))
+    pipe_group.draw(screen)
+    ground.draw(screen)
+    player.draw(screen)
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             exit()
+        if game_active:
+            if event.type == pipe_timer:
+                toppipe_y_placement = random.randint(100, 600)
+                bottompipe_y_placement = toppipe_y_placement + 175
+                pipe_group.add(Pipe(toppipe_y_placement, SCREEN_WIDTH, "top pipe"))
+                pipe_group.add(Pipe(bottompipe_y_placement, SCREEN_WIDTH, "bottom pipe"))
+            get_score(player.sprite, pipe_group.sprites())
 
-    screen.blit(background_surf, (0, 0))
-    player.draw(screen)
-    player.update()
+    if game_active:
+        pipe_group.update()
+        ground.update()
+        player.update()
 
     pygame.display.update()
     clock.tick(60)
