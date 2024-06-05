@@ -38,7 +38,7 @@ class Player(pygame.sprite.Sprite):
 
         # For player jump control logic
         self.jump_sound = pygame.mixer.Sound("sfx/jump.ogg")
-        self.jump_sound.set_volume(1.5)
+        self.jump_sound.set_volume(0.4)
         self.hit_sound = pygame.mixer.Sound("sfx/hit.ogg")
         self.hit_sound.set_volume(0.5)
         self.time_key_pressed = 0
